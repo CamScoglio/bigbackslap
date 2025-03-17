@@ -6,6 +6,22 @@ import requests
 import base64
 import json
 from dotenv import load_dotenv
+import serial
+
+
+arduino_port = "/dev/cu.usbmodem1301"  # Change this to your Arduino port (e.g., COM3 on Windows)
+baud_rate = 9600
+arduino = serial.Serial(arduino_port, baud_rate, timeout=1)
+time.sleep(2)  # Wait for the connection to establish
+
+def send_command_to_arduino(command):
+    """Send a command string to Arduino."""
+    arduino.write(f"{command}\n".encode())
+    time.sleep(0.1)  # Give Arduino time to process
+    
+    # Read response from Arduino (optional)
+    response = arduino.readline().decode().strip()
+    print(f"Arduino says: {response}")
 
 def capture_face_and_analyze():
     # Load environment variables for API key
@@ -137,14 +153,14 @@ def send_to_openai(image_path, api_key):
     }
     
     payload = {
-        "model": "gpt-4-vision-preview",
+        "model": "gpt-4o-mini",
         "messages": [
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "text",
-                        "text": "Describe what you see in this image. Focus on the people, their expressions, the environment, and any notable details."
+                        "text": "If there's food in the photo, please say 'yes', otherwise say 'no'."
                     },
                     {
                         "type": "image_url",
@@ -162,15 +178,12 @@ def send_to_openai(image_path, api_key):
     
     if response.status_code == 200:
         response_data = response.json()
-        analysis_result = response_data["choices"][0]["message"]["content"]
-        print("\nOpenAI Analysis:")
-        print(analysis_result)
+        yes_or_no = response_data["choices"][0]["message"]["content"]
+        print("\nOpenAI statement:")
+        print(yes_or_no)
         
-        # Save the analysis to a text file alongside the image
-        analysis_file = os.path.splitext(image_path)[0] + "_analysis.txt"
-        with open(analysis_file, "w") as f:
-            f.write(analysis_result)
-        print(f"Analysis saved to {analysis_file}")
+        send_command_to_arduino(yes_or_no)
+        
     else:
         print(f"Error from OpenAI API: {response.status_code}")
         print(response.text)
